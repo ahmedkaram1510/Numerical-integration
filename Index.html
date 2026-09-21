@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Numerical Integration Calculator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Math.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; padding-bottom: 5px;}
+        table { border-collapse: collapse; width: 100%; text-align: center; margin-top: 10px; background: white;}
+        th, td { border: 1px solid #d1d5db; padding: 10px; }
+        th { background-color: #e5e7eb; font-weight: 600; color: #374151;}
+        tr:nth-child(even) { background-color: #f9fafb; }
+    </style>
+</head>
+<body class="text-gray-800 p-4 md:p-8 min-h-screen flex flex-col items-center">
+
+    <div class="max-w-6xl w-full bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-blue-700 p-6 text-white text-center">
+            <h1 class="text-3xl font-bold">Numerical Integration Calculator</h1>
+            <p class="mt-2 opacity-90 text-sm">Trapezoidal & Simpson's Rules</p>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Inputs Section -->
+            <div class="lg:col-span-1 space-y-5 bg-gray-50 p-6 rounded-lg border border-gray-200 shadow-sm h-fit">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Inputs</h2>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Function f(x) =</label>
+                    <input type="text" id="funcStr" value="exp(-x^2)" class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Lower Limit (a)</label>
+                        <input type="number" id="lowerLim" value="0" class="w-full border border-gray-300 rounded p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Upper Limit (b)</label>
+                        <input type="number" id="upperLim" value="1" class="w-full border border-gray-300 rounded p-2">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Method</label>
+                    <select id="methodSelect" class="w-full border border-gray-300 rounded p-2">
+                        <option value="trap">Trapezoidal Rule</option>
+                        <option value="simp13">Simpson's 1/3 Rule</option>
+                        <option value="simp38">Simpson's 3/8 Rule</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Type</label>
+                    <select id="typeSelect" class="w-full border border-gray-300 rounded p-2">
+                        <option value="basic">Basic</option>
+                        <option value="composite">Composite</option>
+                    </select>
+                </div>
+
+                <div id="nContainer" style="display: none;" class="bg-blue-50 p-3 rounded border border-blue-100">
+                    <label class="block text-sm font-medium mb-1 text-blue-800">What is given?</label>
+                    <select id="givenType" class="w-full border border-gray-300 rounded p-2 mb-2 focus:ring-2 focus:ring-blue-500" onchange="updateInputLabel()">
+                        <option value="givenN">Number of Subintervals (N)</option>
+                        <option value="givenH">Step Size (h)</option>
+                    </select>
+                    
+                    <label id="dynamicLabel" class="block text-sm font-medium mb-1">Enter N:</label>
+                    <input type="number" id="dynamicValue" value="4" step="any" min="0" class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <p id="nHint" class="text-xs text-blue-600 mt-2 font-medium">N can be any positive integer.</p>
+                </div>
+
+                <button onclick="calculateIntegration()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded transition duration-200 shadow">
+                    Calculate
+                </button>
+                
+                <div id="errorBox" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded text-sm font-medium border border-red-200"></div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="lg:col-span-2 space-y-6">
+                <div id="resultsContainer" class="hidden fade-in">
+                    
+                    <h2 class="text-xl font-semibold mb-4 border-b pb-2">Step-by-Step Solution</h2>
+                    
+                    <!-- 1. Theoretical Rule -->
+                    <div class="mb-5">
+                        <h3 class="font-medium text-gray-700 mb-2">1. Theoretical Formula:</h3>
+                        <div id="formulaTheory" class="bg-white p-3 rounded border shadow-sm overflow-x-auto text-lg"></div>
+                    </div>
+
+                    <!-- 2. Step Size (h) -->
+                    <div class="mb-5">
+                        <h3 id="step2Title" class="font-medium text-gray-700 mb-2">2. Step Size (h):</h3>
+                        <div id="formulaH" class="bg-white p-3 rounded border shadow-sm"></div>
+                    </div>
+
+                    <!-- 3. Points Table -->
+                    <div class="mb-5">
+                        <h3 class="font-medium text-gray-700 mb-2">3. Points Table:</h3>
+                        <div class="overflow-x-auto rounded border shadow-sm">
+                            <table id="pointsTable">
+                                <thead>
+                                    <tr>
+                                        <th id="th_point">Point</th>
+                                        <th id="th_x">Value (x)</th>
+                                        <th id="th_fx">f(x)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 4. Substitution with Colors -->
+                    <div class="mb-5">
+                        <h3 class="font-medium text-gray-700 mb-2">4. Applied Formula (Substitution):</h3>
+                        <div class="bg-gray-50 p-2 rounded text-xs mb-2 flex gap-3 flex-wrap">
+                            <span class="text-blue-600 font-bold">■ First/Last points</span>
+                            <span class="text-green-600 font-bold" id="legendGreen">■ Weight 2</span>
+                            <span class="text-red-600 font-bold hidden" id="legendRed">■ Odd (Weight 4)</span>
+                            <span class="text-orange-500 font-bold hidden" id="legendOrange">■ Rest (Weight 3)</span>
+                        </div>
+                        <div id="formulaSub" class="bg-white p-4 rounded border shadow-sm overflow-x-auto text-lg"></div>
+                    </div>
+
+                    <!-- 5. Final Answer & Error -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">5. Final Answer:</h3>
+                            <div id="finalAnswer" class="bg-green-50 p-4 rounded border border-green-200 text-xl font-bold text-center text-green-800 shadow-sm h-full flex items-center justify-center"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Extra: Error Analysis</h3>
+                            <div id="errorAnalysis" class="bg-blue-50 p-4 rounded border border-blue-200 text-sm text-blue-900 shadow-sm h-full flex flex-col justify-center"></div>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <div id="placeholderMsg" class="h-full flex items-center justify-center text-gray-400 italic text-center p-10 border-2 border-dashed rounded-xl bg-gray-50">
+                    Enter the inputs and click "Calculate" to see the step-by-step solution, colored substitutions, and the visualized graph.
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Graph Section -->
+        <div id="graphContainer" class="hidden p-6 md:p-8 border-t border-gray-200 bg-white">
+            <h2 class="text-xl font-semibold mb-4">Function Graph & Subintervals</h2>
+            <p class="text-sm text-gray-500 mb-4">The vertical dashed lines represent the subintervals (N) generated by step size h.</p>
+            <div class="relative h-96 w-full bg-gray-50 rounded border shadow-inner p-2">
+                <canvas id="integrationChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let myChart = null;
+
+        // UI Logic
+        const typeSelect = document.getElementById('typeSelect');
+        const methodSelect = document.getElementById('methodSelect');
+        const nContainer = document.getElementById('nContainer');
+        const nHint = document.getElementById('nHint');
+        const givenType = document.getElementById('givenType');
+        const dynamicLabel = document.getElementById('dynamicLabel');
+
+        function updateInputLabel() {
+            if (givenType.value === 'givenN') {
+                dynamicLabel.innerText = "Enter N:";
+            } else {
+                dynamicLabel.innerText = "Enter h:";
+            }
+            updateNVisibility();
+        }
+
+        function updateNVisibility() {
+            if (typeSelect.value === 'composite') {
+                nContainer.style.display = 'block';
+                if (givenType.value === 'givenN') {
+                    if(methodSelect.value === 'trap') nHint.innerText = "N can be any positive integer.";
+                    if(methodSelect.value === 'simp13') nHint.innerText = "N MUST be an EVEN integer.";
+                    if(methodSelect.value === 'simp38') nHint.innerText = "N MUST be a multiple of 3.";
+                } else {
+                    nHint.innerText = "h must divide the interval (b - a) evenly.";
+                }
+            } else {
+                nContainer.style.display = 'none';
+            }
+        }
+
+        typeSelect.addEventListener('change', updateNVisibility);
+        methodSelect.addEventListener('change', updateNVisibility);
+
+        function showError(msg) {
+            const errBox = document.getElementById('errorBox');
+            errBox.innerText = msg;
+            errBox.style.display = 'block';
+            
+            // إخفاء النتائج القديمة فوراً عند حدوث خطأ
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('graphContainer').style.display = 'none';
+            document.getElementById('placeholderMsg').style.display = 'flex';
+        }
+        function hideError() {
+            document.getElementById('errorBox').style.display = 'none';
+        }
+
+        function renderMath(elementId, texString, isDisplay = true) {
+            katex.render(texString, document.getElementById(elementId), {
+                throwOnError: false,
+                displayMode: isDisplay
+            });
+        }
+
+        function formatNum(num) {
+            return Number.isInteger(num) ? num : parseFloat(num.toFixed(5));
+        }
+
+        // Calculate "Exact" integration using fine Simpson's rule for error analysis
+        function calculateExact(f, a, b) {
+            const N_exact = 1000;
+            const h = (b - a) / N_exact;
+            let sum = f.evaluate({x: a}) + f.evaluate({x: b});
+            for(let i=1; i<N_exact; i++) {
+                let xi = a + i*h;
+                sum += (i%2 === 0 ? 2 : 4) * f.evaluate({x: xi});
+            }
+            return (h/3) * sum;
+        }
+
+        function calculateIntegration() {
+            hideError();
+            
+            const fStr = document.getElementById('funcStr').value;
+            const a = parseFloat(document.getElementById('lowerLim').value);
+            const b = parseFloat(document.getElementById('upperLim').value);
+            const method = document.getElementById('methodSelect').value;
+            const type = document.getElementById('typeSelect').value;
+            
+            if(isNaN(a) || isNaN(b) || a >= b) {
+                showError("Please enter valid limits. (a) must be less than (b).");
+                return;
+            }
+
+            let N = 1;
+            let isGivenH = false;
+            if (type === 'basic') {
+                if (method === 'trap') N = 1;
+                else if (method === 'simp13') N = 2;
+                else if (method === 'simp38') N = 3;
+            } else {
+                let inputValue = parseFloat(document.getElementById('dynamicValue').value);
+                
+                if (isNaN(inputValue) || inputValue <= 0) { 
+                    showError("Please enter a valid positive number."); return; 
+                }
+
+                if (givenType.value === 'givenN') {
+                    N = parseInt(inputValue);
+                    if (N !== inputValue) { showError("N must be a whole integer."); return; }
+                } else {
+                    isGivenH = true;
+                    let calculatedN = (b - a) / inputValue;
+                    N = Math.round(calculatedN);
+                    
+                    if (Math.abs(calculatedN - N) > 1e-6) {
+                        showError(`The step size h=${inputValue} does not fit exactly between limits a and b.`);
+                        return;
+                    }
+                }
+
+                if (method === 'simp13' && N % 2 !== 0) { showError(`Simpson 1/3 requires an EVEN number of intervals. Current N = ${N}.`); return; }
+                if (method === 'simp38' && N % 3 !== 0) { showError(`Simpson 3/8 requires N to be a multiple of 3. Current N = ${N}.`); return; }
+            }
+
+            let f;
+            try {
+                f = math.compile(fStr);
+                f.evaluate({x: a});
+            } catch (e) {
+                showError("Invalid function. Use standard math (e.g. x^2, exp(x)).");
+                return;
+            }
+
+            const h = (b - a) / N;
+            const x = [], y = [];
+            
+            for (let i = 0; i <= N; i++) {
+                let xi = (i === 0) ? a : (i === N ? b : a + i * h);
+                x.push(xi);
+                y.push(f.evaluate({x: xi}));
+            }
+
+            // Colors setup for KaTeX:
+            const cBlue = "\\textcolor{#2563eb}"; // First/Last
+            const cGreen = "\\textcolor{#16a34a}"; // weight 2 or middle for trap
+            const cRed = "\\textcolor{#dc2626}";   // odd (weight 4)
+            const cOrange = "\\textcolor{#f97316}";// rest for 3/8 (weight 3)
+
+            let theoryTex = "", subTex = "", ans = 0;
+            const fh = formatNum(h);
+
+            // Legend Toggles
+            document.getElementById('legendRed').classList.add('hidden');
+            document.getElementById('legendOrange').classList.add('hidden');
+            document.getElementById('legendGreen').innerText = "■ Middle / Even (Weight 2)";
+
+            if (method === 'trap') {
+                document.getElementById('legendGreen').innerText = "■ Middle points";
+                if (type === 'basic') {
+                    theoryTex = `I \\approx \\frac{h}{2} [f(a) + f(b)]`;
+                    subTex = `I \\approx \\frac{${fh}}{2} \\left[ ${cBlue}{${formatNum(y[0])}} + ${cBlue}{${formatNum(y[1])}} \\right]`;
+                    ans = (h / 2) * (y[0] + y[1]);
+                } else {
+                    theoryTex = `I \\approx \\frac{h}{2} \\left[ f(x_0) + 2 \\sum_{i=1}^{N-1} f(x_i) + f(x_N) \\right]`;
+                    let sumMid = 0, midStrs = [];
+                    for(let i=1; i<N; i++) { sumMid += y[i]; midStrs.push(formatNum(y[i])); }
+                    let midTxt = midStrs.length > 5 ? `${midStrs[0]} + ... + ${midStrs[midStrs.length-1]}` : midStrs.join(' + ');
+                    subTex = `I \\approx \\frac{${fh}}{2} \\left[ ${cBlue}{${formatNum(y[0])}} + 2(${cGreen}{${midTxt || '0'}}) + ${cBlue}{${formatNum(y[N])}} \\right]`;
+                    ans = (h / 2) * (y[0] + 2 * sumMid + y[N]);
+                }
+            } 
+            else if (method === 'simp13') {
+                document.getElementById('legendRed').classList.remove('hidden');
+                document.getElementById('legendGreen').innerText = "■ Even points (Weight 2)";
+                
+                if (type === 'basic') {
+                    theoryTex = `I \\approx \\frac{h}{3} [f(x_0) + 4f(x_1) + f(x_2)]`;
+                    subTex = `I \\approx \\frac{${fh}}{3} \\left[ ${cBlue}{${formatNum(y[0])}} + 4(${cRed}{${formatNum(y[1])}}) + ${cBlue}{${formatNum(y[2])}} \\right]`;
+                    ans = (h / 3) * (y[0] + 4 * y[1] + y[2]);
+                } else {
+                    theoryTex = `I \\approx \\frac{h}{3} \\left[ f(x_0) + 4 \\sum_{i \\text{ odd}} f(x_i) + 2 \\sum_{i \\text{ even}} f(x_i) + f(x_N) \\right]`;
+                    let sumOdd = 0, sumEven = 0, oddStrs = [], evenStrs = [];
+                    for(let i=1; i<N; i++) {
+                        if(i%2 !== 0) { sumOdd += y[i]; oddStrs.push(formatNum(y[i])); }
+                        else { sumEven += y[i]; evenStrs.push(formatNum(y[i])); }
+                    }
+                    let oddTxt = oddStrs.length > 4 ? `${oddStrs[0]} + ... + ${oddStrs[oddStrs.length-1]}` : oddStrs.join(' + ');
+                    let evenTxt = evenStrs.length > 4 ? `${evenStrs[0]} + ... + ${evenStrs[evenStrs.length-1]}` : evenStrs.join(' + ');
+                    subTex = `I \\approx \\frac{${fh}}{3} \\left[ ${cBlue}{${formatNum(y[0])}} + 4(${cRed}{${oddTxt}}) + 2(${cGreen}{${evenTxt || '0'}}) + ${cBlue}{${formatNum(y[N])}} \\right]`;
+                    ans = (h / 3) * (y[0] + 4 * sumOdd + 2 * sumEven + y[N]);
+                }
+            }
+            else if (method === 'simp38') {
+                document.getElementById('legendOrange').classList.remove('hidden');
+                document.getElementById('legendGreen').innerText = "■ Multiples of 3 (Weight 2)";
+                
+                if (type === 'basic') {
+                    theoryTex = `I \\approx \\frac{3h}{8} [f(x_0) + 3f(x_1) + 3f(x_2) + f(x_3)]`;
+                    subTex = `I \\approx \\frac{3(${fh})}{8} \\left[ ${cBlue}{${formatNum(y[0])}} + 3(${cOrange}{${formatNum(y[1])}}) + 3(${cOrange}{${formatNum(y[2])}}) + ${cBlue}{${formatNum(y[3])}} \\right]`;
+                    ans = (3 * h / 8) * (y[0] + 3 * y[1] + 3 * y[2] + y[3]);
+                } else {
+                    theoryTex = `I \\approx \\frac{3h}{8} \\left[ f(x_0) + 3 \\sum_{i \\neq 3k} f(x_i) + 2 \\sum_{i = 3k} f(x_i) + f(x_N) \\right]`;
+                    let sum3 = 0, sumRest = 0, s3Strs = [], sRestStrs = [];
+                    for(let i=1; i<N; i++) {
+                        if(i%3 === 0) { sum3 += y[i]; s3Strs.push(formatNum(y[i])); }
+                        else { sumRest += y[i]; sRestStrs.push(formatNum(y[i])); }
+                    }
+                    let s3Txt = s3Strs.length > 4 ? `${s3Strs[0]} + ... + ${s3Strs[s3Strs.length-1]}` : s3Strs.join(' + ');
+                    let sRestTxt = sRestStrs.length > 4 ? `${sRestStrs[0]} + ... + ${sRestStrs[sRestStrs.length-1]}` : sRestStrs.join(' + ');
+                    subTex = `I \\approx \\frac{3(${fh})}{8} \\left[ ${cBlue}{${formatNum(y[0])}} + 3(${cOrange}{${sRestTxt}}) + 2(${cGreen}{${s3Txt || '0'}}) + ${cBlue}{${formatNum(y[N])}} \\right]`;
+                    ans = (3 * h / 8) * (y[0] + 3 * sumRest + 2 * sum3 + y[N]);
+                }
+            }
+
+            // Output Rendering
+            document.getElementById('placeholderMsg').style.display = 'none';
+            document.getElementById('resultsContainer').style.display = 'block';
+            document.getElementById('graphContainer').style.display = 'block';
+
+            renderMath('formulaTheory', theoryTex);
+            
+            // Dynamic Step 2 Title & Formula based on given type
+            if (type === 'composite' && isGivenH) {
+                document.getElementById('step2Title').innerText = "2. Number of Subintervals (N):";
+                renderMath('formulaH', `N = \\frac{b - a}{h} = \\frac{${b} - ${a}}{${fh}} = ${N}`);
+            } else {
+                document.getElementById('step2Title').innerText = "2. Step Size (h):";
+                renderMath('formulaH', `h = \\frac{b - a}{N} = \\frac{${b} - ${a}}{${N}} = ${fh}`);
+            }
+
+            // Dynamic Table Headers using KaTeX
+            let parsedNode = math.parse(fStr);
+            parsedNode = parsedNode.transform(function (node) {
+                if (node.isSymbolNode && node.name === 'x') {
+                    return new math.SymbolNode('x_i');
+                }
+                return node;
+            });
+
+            let fStrDisp = parsedNode.toTex();
+            fStrDisp = fStrDisp.replace(/x\\_i/g, 'x_i');
+            fStrDisp = fStrDisp.replace(/\\exp\\left\((.*?)\\right\)/g, 'e^{$1}');
+
+            renderMath('th_point', 'x_i', false);
+            renderMath('th_x', 'Value', false);
+            renderMath('th_fx', `f(x_i) = ${fStrDisp}`, false);
+
+            const tbody = document.querySelector('#pointsTable tbody');
+            tbody.innerHTML = '';
+            for(let i = 0; i <= N; i++) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td id="cell_xi_${i}"></td>
+                    <td>${formatNum(x[i])}</td>
+                    <td>${formatNum(y[i])}</td>
+                `;
+                tbody.appendChild(tr);
+                renderMath(`cell_xi_${i}`, `x_{${i}}`, false);
+            }
+
+            renderMath('formulaSub', subTex);
+            document.getElementById('finalAnswer').innerHTML = `I &approx; ${ans.toFixed(6)}`;
+
+            // Error Analysis
+            const exactVal = calculateExact(f, a, b);
+            const error = Math.abs(exactVal - ans);
+            document.getElementById('errorAnalysis').innerHTML = `
+                <div><strong>Near-Exact Integration:</strong> ${exactVal.toFixed(6)}</div>
+                <div class="mt-1"><strong>Absolute Error |E|:</strong> ${error.toExponential(4)}</div>
+            `;
+
+            drawGraph(f, a, b, x, y, method);
+        }
+
+        function drawGraph(f, a, b, pX, pY, method) {
+            const ctx = document.getElementById('integrationChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            const curveX = [], curveY = [];
+            const step = (b - a) / 100;
+            for(let i=0; i<=100; i++) {
+                let currX = a + i * step;
+                curveX.push(currX);
+                curveY.push(f.evaluate({x: currX}));
+            }
+
+            let areaData = pX.map((xi, i) => ({x: xi, y: pY[i]}));
+
+            let verticalLines = [];
+            for (let i = 0; i < pX.length; i++) {
+                verticalLines.push({x: pX[i], y: 0});
+                verticalLines.push({x: pX[i], y: pY[i]});
+                verticalLines.push({x: NaN, y: NaN});
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: curveX,
+                    datasets: [
+                        {
+                            label: 'Function f(x)',
+                            data: curveY,
+                            borderColor: '#1e3a8a',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Approximation Area',
+                            data: areaData,
+                            backgroundColor: 'rgba(56, 189, 248, 0.3)',
+                            borderColor: 'transparent',
+                            fill: true,
+                            pointRadius: 6,
+                            pointBackgroundColor: '#ef4444',
+                            tension: method === 'trap' ? 0 : 0.4
+                        },
+                        {
+                            label: 'Subintervals',
+                            data: verticalLines,
+                            borderColor: '#6b7280',
+                            borderWidth: 1.5,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointRadius: 0,
+                            spanGaps: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'linear', position: 'bottom', title: { display: true, text: 'x axis' } },
+                        y: { title: { display: true, text: 'f(x)' } }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return `(${context.parsed.x.toFixed(3)}, ${context.parsed.y.toFixed(5)})`; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
