@@ -100,13 +100,6 @@ tr:nth-child(even) { background-color: #f9fafb; }
         <p id="nHint" class="text-xs text-blue-600 mt-2 font-medium">N can be any positive integer.</p>
     </div>
 
-    <!-- Table + Composite -->
-    <div id="dataN" style="display:none;" class="bg-blue-50 p-3 rounded border border-blue-100">
-        <label class="block text-sm font-medium mb-1 text-blue-800">Number of Subintervals (N)</label>
-        <input type="number" id="dataNValue" step="1" min="1" placeholder="Leave empty to use the whole table" class="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        <p id="dataNHint" class="text-xs text-blue-600 mt-2 font-medium">Empty = use all table points. First and last points are always kept.</p>
-    </div>
-
     <button onclick="calculateIntegration()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded transition duration-200 shadow">Calculate</button>
     <div id="errorBox" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded text-sm font-medium border border-red-200"></div>
 </div>
@@ -192,8 +185,7 @@ const methodSelect = document.getElementById('methodSelect');
 const funcFields = document.getElementById('funcFields');
 const dataFields = document.getElementById('dataFields');
 const nContainer = document.getElementById('nContainer');
-const dataN = document.getElementById('dataN');
-const dataNHint = document.getElementById('dataNHint');
+const dynamicValue = document.getElementById('dynamicValue');
 const nHint = document.getElementById('nHint');
 const givenType = document.getElementById('givenType');
 const dynamicLabel = document.getElementById('dynamicLabel');
@@ -207,6 +199,8 @@ function updateMode() {
     const isData = modeSelect.value === 'data';
     funcFields.style.display = isData ? 'none' : 'block';
     dataFields.style.display = isData ? 'block' : 'none';
+    dynamicValue.value = isData ? '' : '4';
+    dynamicValue.placeholder = isData ? 'Empty = use the whole table' : '';
     updateNVisibility();
 }
 
@@ -215,22 +209,18 @@ function updateNVisibility() {
     const isComp = typeSelect.value === 'composite';
     const m = methodSelect.value;
 
-    nContainer.style.display = (!isData && isComp) ? 'block' : 'none';
-    dataN.style.display = (isData && isComp) ? 'block' : 'none';
+    nContainer.style.display = isComp ? 'block' : 'none';
+    if (!isComp) return;
 
-    if (!isData && isComp) {
-        if (givenType.value === 'givenN') {
-            if (m === 'trap') nHint.innerText = "N can be any positive integer.";
-            if (m === 'simp13') nHint.innerText = "N MUST be an EVEN integer.";
-            if (m === 'simp38') nHint.innerText = "N MUST be a multiple of 3.";
-        } else {
-            nHint.innerText = "h must divide the interval (b - a) evenly.";
-        }
+    if (givenType.value === 'givenN') {
+        if (m === 'trap') nHint.innerText = "N can be any positive integer.";
+        if (m === 'simp13') nHint.innerText = "N MUST be an EVEN integer.";
+        if (m === 'simp38') nHint.innerText = "N MUST be a multiple of 3.";
+    } else {
+        nHint.innerText = isData ? "h must be a multiple of the table step (points are picked from the table)."
+                                 : "h must divide the interval (b - a) evenly.";
     }
-    if (isData && isComp) {
-        const extra = m === 'simp13' ? " N must be even." : (m === 'simp38' ? " N must be a multiple of 3." : "");
-        dataNHint.innerText = "Empty = use all table points. First and last points are always kept." + extra;
-    }
+    if (isData) nHint.innerText += " Empty = use all table points.";
 }
 
 modeSelect.addEventListener('change', updateMode);
@@ -300,9 +290,20 @@ function calculateIntegration() {
         if (type === 'basic') {
             N = basicN;
         } else {
-            const raw = document.getElementById('dataNValue').value.trim();
-            N = raw === '' ? M : Number(raw);
-            if (!Number.isInteger(N) || N < 1) { showError("N must be a positive whole number."); return; }
+            const raw = dynamicValue.value.trim();
+            if (raw === '') {
+                N = M;
+            } else if (givenType.value === 'givenN') {
+                N = Number(raw);
+                if (!Number.isInteger(N) || N < 1) { showError("N must be a positive whole number."); return; }
+            } else {
+                const hv = Number(raw);
+                if (isNaN(hv) || hv <= 0) { showError("Please enter a valid positive h."); return; }
+                isGivenH = true;
+                const calcN = (allX[M] - allX[0]) / hv;
+                N = Math.round(calcN);
+                if (N < 1 || Math.abs(calcN - N) > 1e-6) { showError(`The step size h=${hv} does not fit exactly between the first and last table points.`); return; }
+            }
         }
 
         if (method === 'simp13' && N % 2 !== 0) { showError(`Simpson 1/3 requires an EVEN N. Current N = ${N}.`); return; }
@@ -429,7 +430,7 @@ function calculateIntegration() {
 
     renderMath('formulaTheory', theoryTex);
 
-    if (!isData && type === 'composite' && isGivenH) {
+    if (type === 'composite' && isGivenH) {
         document.getElementById('step2Title').innerText = "2. Number of Subintervals (N):";
         renderMath('formulaH', `N = \\frac{b - a}{h} = \\frac{${b} - ${a}}{${fh}} = ${N}`);
     } else {
